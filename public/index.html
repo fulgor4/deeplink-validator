@@ -367,7 +367,7 @@ async function detectServer() {
   const base = hopsApiBase();
   if (base !== null) {
     try { // only our API counts: other hosts (e.g. GitHub's own /healthz) answer differently
-      const h = await fetch(base + "/healthz"), j = h.ok ? await h.json().catch(() => ({})) : {};
+      const h = await fetch(base + "/api/health"), j = h.ok ? await h.json().catch(() => ({})) : {};
       serverOk = j.ok === true && j.service === "deeplink-hops"; runsJs = serverOk && !!j.runsJs; apiBase = base;
     } catch (e) { serverOk = false; }
   }

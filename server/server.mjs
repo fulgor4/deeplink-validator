@@ -5,7 +5,8 @@
 // This folder (server/) is self-contained: deploy it on its own (see Dockerfile).
 //
 //   GET /api/hops?url=…[&ua=ios|android|desktop]  -> { startUrl, hops:[…], finalUrl, stopped, source:"hops-api" }
-//   GET /healthz                                  -> { ok:true, service:"deeplink-hops", runsJs }
+//   GET /api/health (or /healthz)                 -> { ok:true, service:"deeplink-hops", runsJs }
+//                      (Cloud Run reserves /healthz and answers it itself, so the page uses /api/health)
 //
 // Environment:
 //   PORT (8080)  HOST (127.0.0.1; use 0.0.0.0 in a container)
@@ -104,14 +105,15 @@ export function createServer(o = {}) {
   const server = http.createServer(async (req, res) => {
     try {
       const u = new URL(req.url, "http://x");
-      if (u.pathname === "/api/hops" || u.pathname === "/healthz") {
+      const isHealth = u.pathname === "/api/health" || u.pathname === "/healthz";
+      if (u.pathname === "/api/hops" || isHealth) {
         const oc = originCheck(req);
         if (req.method === "OPTIONS") { // not needed for a plain GET, answered for completeness
           res.writeHead(oc.ok ? 204 : 403, { ...API_HEADERS, ...(oc.cors ? { "access-control-allow-origin": oc.cors, "access-control-allow-methods": "GET", vary: "Origin" } : {}) });
           return res.end();
         }
         if (req.method !== "GET") return send(res, 405, { error: "method not allowed" }, oc.cors);
-        if (u.pathname === "/healthz") return send(res, 200, { ok: true, service: "deeplink-hops", runsJs: !!(jsRunner && jsRunner.available) }, oc.cors);
+        if (isHealth) return send(res, 200, { ok: true, service: "deeplink-hops", runsJs: !!(jsRunner && jsRunner.available) }, oc.cors);
         if (!oc.ok) return send(res, 403, { error: "this page is not allowed to use the API" }, null);
         if (limited(clientIp(req))) return send(res, 429, { error: "rate limit exceeded, try again in a minute" }, oc.cors);
         if (inflight >= maxInflight) return send(res, 503, { error: "busy, retry shortly" }, oc.cors);

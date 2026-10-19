@@ -59,7 +59,7 @@ The page turns the hops into the full report itself (`DLCore.buildReport` in `pu
 | Setting (env) | Default | |
 |---|---|---|
 | `PORT` / `HOST` | `8080` / `127.0.0.1` | use `HOST=0.0.0.0` in a container (the Dockerfile does) |
-| `ALLOWED_ORIGINS` | none (same origin only) | comma-separated origins of the pages allowed to call the API, e.g. `https://gecgithub01.walmart.com` (scheme + host, no path). When set, other websites **and requests with no browser origin (curl, scripts)** get 403. `*` allows any page. |
+| `ALLOWED_ORIGINS` | none = open to everyone | not set or `*`: any web page, curl and scripts can call the API. Set it to a comma-separated list of origins (e.g. `https://fulgor4.github.io`, scheme + host, no path) to allow only those pages; other websites **and requests with no browser origin (curl, scripts)** then get 403. |
 | `RATE_LIMIT_PER_MIN` | `100` | per client IP |
 | `TRUST_PROXY` | off (`1` in the Dockerfile) | take the client IP from `X-Forwarded-For`. Needed behind a load balancer / reverse proxy (most hosts), otherwise every user shares one limit. Leave off when clients connect directly (they could fake the header). |
 | `MAX_INFLIGHT` | `10` | traces at once; each JavaScript page uses one Chrome tab (~100–200 MB) |
@@ -70,7 +70,7 @@ The page turns the hops into the full report itself (`DLCore.buildReport` in `pu
 | `SKIP_DNS_CHECK` | on when a proxy is set | the proxy resolves names |
 | `SERVE_SITE` | off (`1` via `./serve`) | also serve `public/` (local development) |
 
-`ALLOWED_ORIGINS` keeps other websites from using your API through their visitors' browsers, and stops casual scripts. It is not a login: a script can fake the headers. Use your host's access control if it must be private.
+When set, `ALLOWED_ORIGINS` keeps other websites from using your API through their visitors' browsers, and stops casual scripts. It is not a login: a script can fake the headers. Use your host's access control if it must be private.
 
 ## Hosting it
 
