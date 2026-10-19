@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deeplink Checker</title>
+<style>
+  :root {
+    --blue:#0053e2; --deep:#1a365d; --text:#2e2f32; --muted:#6b6e75; --bg:#f6f8fc; --card:#fff; --line:#e6e8ec;
+    --ok:#2a8703; --ok-bg:#eaf6e3; --bad:#c9150b; --bad-bg:#ffecea; --warn:#8a4b00; --warn-bg:#fff4d6; --warn-line:#ffc220;
+    --cant:#55575c; --cant-bg:#eef0f2; --soon:#0053e2; --soon-bg:#e9f0ff;
+    --font: EverydaySans, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 var(--font); }
+  button, textarea { font:inherit; }
+  :focus-visible { outline:3px solid #7fa8ff; outline-offset:2px; }
+
+  /* ---------- blue header band ---------- */
+  .band { position:relative; overflow:hidden; color:#fff; padding:clamp(36px,7vh,64px) 20px 104px;
+    background:linear-gradient(135deg,#3f7df0 0%,#2e70eb 45%,#1a365d 100%); }
+  .band::before { content:""; position:absolute; inset:0; pointer-events:none; background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.07) 1px,transparent 0); background-size:36px 36px; }
+  .band::after { content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse at 88% 10%,rgba(0,192,251,.20) 0,transparent 42%),radial-gradient(ellipse at 8% 100%,rgba(255,255,255,.10) 0,transparent 45%); }
+  .band-inner { position:relative; z-index:1; max-width:640px; margin:0 auto; }
+  .brand { display:flex; align-items:center; gap:12px; margin-bottom:14px; font-weight:600; font-size:15px; letter-spacing:.01em; color:rgba(255,255,255,.92); }
+  .brand .tile { width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; }
+  .band h1 { margin:0 0 8px; font-size:clamp(28px,4.4vw,38px); font-weight:600; letter-spacing:-.6px; line-height:1.12; }
+  .band p { margin:0; font-size:17px; color:rgba(255,255,255,.92); max-width:520px; }
+
+  main { position:relative; z-index:2; max-width:640px; margin:-64px auto 0; padding:0 16px 56px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 32px rgba(13,40,100,.10); padding:20px; }
+  label.field { display:block; font-weight:600; margin:0 0 8px; }
+  textarea#url { width:100%; min-height:104px; resize:vertical; padding:13px 14px; border:1px solid #c9ccd2; border-radius:10px; background:#fff; color:var(--text); font-family:var(--mono); font-size:13px; line-height:1.5; }
+  textarea#url:focus { border-color:var(--blue); }
+  .actions { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:14px; }
+  button.primary { height:50px; padding:0 30px; border:0; border-radius:10px; background:var(--blue); color:#fff; font-weight:600; font-size:16px; cursor:pointer; box-shadow:0 2px 12px rgba(0,83,226,.28); }
+  button.primary:hover:not(:disabled) { background:#0046bd; }
+  button.primary:disabled { opacity:.65; cursor:default; }
+  .hint { font-size:13px; color:var(--muted); margin:12px 0 0; }
+  #msg { color:var(--bad); font-weight:600; font-size:14px; }
+
+  /* ---------- results ---------- */
+  #out { margin-top:20px; }
+  .callout { display:flex; gap:10px; border-radius:12px; padding:12px 14px; margin-bottom:14px; background:var(--warn-bg); border:1px solid var(--warn-line); font-size:14px; }
+  .callout strong { display:block; }
+  .banner { display:flex; gap:14px; align-items:center; border-radius:14px; padding:16px 18px; margin-bottom:6px; }
+  .banner .big { flex:none; width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700; color:#fff; }
+  .banner h2 { margin:0; font-size:21px; font-weight:600; letter-spacing:-.3px; line-height:1.2; }
+  .banner p { margin:2px 0 0; }
+  .banner.ok { background:var(--ok-bg); } .banner.ok .big { background:var(--ok); } .banner.ok h2 { color:var(--ok); }
+  .banner.bad { background:var(--bad-bg); } .banner.bad .big { background:var(--bad); } .banner.bad h2 { color:var(--bad); }
+  .banner.warn { background:var(--warn-bg); } .banner.warn .big { background:#e8a100; } .banner.warn h2 { color:var(--warn); }
+  .banner.cant { background:var(--cant-bg); } .banner.cant .big { background:var(--cant); } .banner.cant h2 { color:var(--cant); }
+
+  ul.pillars { list-style:none; margin:0; padding:0; }
+  li.pillar { display:flex; gap:14px; padding:16px 4px; border-bottom:1px solid var(--line); }
+  li.pillar:last-child { border-bottom:0; }
+  .dot { flex:none; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:#fff; margin-top:1px; }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--bad); } .dot.warn { background:#e8a100; } .dot.cant { background:#8d9096; } .dot.soon { background:#b9c9ee; }
+  .p-body { flex:1; min-width:0; }
+  .p-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .p-head { margin:2px 0 0; font-size:18px; font-weight:600; letter-spacing:-.2px; line-height:1.3; }
+  .p-text { margin:4px 0 0; }
+  li.pillar.soon .p-head, li.pillar.soon .p-text { color:var(--muted); }
+  .issue { margin-top:10px; padding:12px 14px; border-radius:10px; }
+  .issue.bad { background:var(--bad-bg); } .issue.warn { background:var(--warn-bg); }
+  .issue p { margin:0; } .issue .fix { margin-top:8px; font-size:14px; }
+  .copybox { margin-top:10px; } .copybox .lbl { font-size:13px; font-weight:600; margin-bottom:4px; }
+  pre { font-family:var(--mono); font-size:12px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:4px 0 0; overflow-x:auto; white-space:pre-wrap; overflow-wrap:anywhere; max-height:160px; }
+  button.copy { margin-top:8px; height:34px; padding:0 14px; border-radius:8px; border:1px solid var(--blue); background:#fff; color:var(--blue); font-weight:600; font-size:13px; cursor:pointer; }
+  button.copy:hover { background:var(--soon-bg); }
+
+  .journey { padding:16px 4px 4px; border-top:1px solid var(--line); }
+  .journey h3 { margin:0 0 10px; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .route { display:flex; flex-direction:column; align-items:flex-start; gap:0; }
+  .stop { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .arrow { color:#9aa0aa; margin:1px 0 1px 16px; line-height:1.2; }
+  button.dom { background:#f1f5fd; border:1px solid #d5e1fa; border-radius:8px; padding:4px 10px; font-weight:600; color:var(--text); cursor:pointer; text-align:left; overflow-wrap:anywhere; }
+  button.dom:hover, button.dom[aria-expanded="true"] { border-color:var(--blue); color:var(--blue); } button.dom .dots { color:var(--muted); font-weight:400; margin-left:1px; }
+  .tag { font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--soon-bg); color:var(--soon); white-space:nowrap; }
+  .tag.bad { background:var(--bad-bg); color:var(--bad); } .tag.warn { background:var(--warn-bg); color:var(--warn); }
+  .tag.ok { background:var(--ok-bg); color:var(--ok); } .tag.cant { background:var(--cant-bg); color:var(--cant); }
+  ul.lands { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
+  li.land { border:1px solid var(--line); border-left-width:4px; border-radius:10px; padding:10px 12px; background:#fff; }
+  li.land.ok { border-left-color:var(--ok); } li.land.warn { border-left-color:var(--warn-line); } li.land.bad { border-left-color:var(--bad); } li.land.cant { border-left-color:#8d9096; }
+  .land-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .plat { font-weight:700; font-size:14px; min-width:62px; }
+  .land-head .tag { white-space:normal; }
+  .land-text { margin:6px 0 0; font-size:14px; } .land-note { margin:4px 0 0; font-size:13px; color:var(--muted); }
+  .j-full { margin:10px 0 0; }
+  .j-full .j-label { font-size:13px; color:var(--muted); }
+  .source { font-size:12px; color:var(--muted); margin:10px 0 0; }
+
+  details.tech { margin-top:14px; }
+  details > summary { cursor:pointer; font-weight:600; color:var(--blue); font-size:14px; }
+  details .inner { margin-top:10px; }
+  .tech h5 { margin:16px 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .tech .detail { font-size:13px; color:var(--muted); margin:6px 0 0; overflow-wrap:anywhere; }
+  ul.checks { list-style:none; margin:0; padding:0; }
+  ul.checks li { border-left:4px solid var(--line); padding:6px 10px; margin-bottom:6px; font-size:14px; background:#fff; }
+  ul.checks li.pass { border-left-color:var(--ok); } ul.checks li.warn { border-left-color:var(--warn-line); } ul.checks li.fail { border-left-color:var(--bad); } ul.checks li.info { border-left-color:#9db8f5; }
+  .badge { display:inline-block; min-width:42px; text-align:center; font-size:11px; font-weight:700; border-radius:999px; padding:1px 8px; margin-right:8px; background:var(--cant-bg); color:var(--cant); }
+  .badge.pass { background:var(--ok-bg); color:var(--ok); } .badge.fail { background:var(--bad-bg); color:var(--bad); } .badge.warn { background:var(--warn-bg); color:var(--warn); } .badge.info { background:var(--soon-bg); color:var(--soon); }
+  .appview pre.app { border-color:var(--blue); } .appview pre.badroute { border-color:var(--bad); color:var(--bad); }
+  .error { color:var(--bad); font-weight:600; }
+  .foot { text-align:center; color:var(--muted); font-size:12px; margin:28px 0 0; }
+
+  @media (max-width: 520px) {
+    .band { padding-bottom:92px; }
+    .band p { font-size:15px; }
+    li.pillar { gap:10px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    #out > * { animation:rise .3s ease-out both; }
+    @keyframes rise { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  }
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="band-inner">
+    <div class="brand">
+      <span class="tile" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.33-1.3"/></svg>
+      </span>
+      Walmart campaign tools
+    </div>
+    <h1>Deeplink Checker</h1>
+    <p>Paste a campaign link and find out if it works before you send it.</p>
+  </div>
+</header>
+
+<main>
+  <section class="card" aria-label="Link to check">
+    <label class="field" for="url">Your link</label>
+    <textarea id="url" spellcheck="false" placeholder="https://"></textarea>
+    <div class="actions">
+      <button id="go" type="button" class="primary">Check link</button>
+      <span id="msg" role="alert"></span>
+    </div>
+    <p id="tracenote" class="hint"></p>
+  </section>
+
+  <section id="out" aria-live="polite"></section>
+
+  <p class="foot">Results come from how the link is built and where it redirects. For a final answer, tap it on a phone with the Walmart app.</p>
+</main>
+
+<script src="config.js"></script>
+<script src="js/app-routes-android.generated.js"></script>
+<script src="js/app-routes.js"></script>
+<script src="js/core.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = String(text); return n; }
+const STATUSES = new Set(["pass", "warn", "fail", "info"]);
+const st = (s) => (STATUSES.has(s) ? s : "info");
+const ICON = { ok: "✓", bad: "✕", warn: "!", cant: "?", soon: "…" };
+const REDIRECTCHECK_API = "https://www.redirectcheck.org/api/check";
+const VPN_NOTE = "This checker only works outside the Walmart VPN. Disconnect from the VPN and try again.";
+let serverOk = false, runsJs = false, apiBase = "";
+const CONFIG = (typeof window !== "undefined" && window.DL_CONFIG) || {};
+
+function expectArgs() { return { etype: "", eid: "" }; }
+function parseReport(text) {
+  const i = text.indexOf("{");
+  if (i < 0) throw new Error("No results found.");
+  let d; try { d = JSON.parse(text.slice(i)); } catch (e) { throw new Error("That isn't valid JSON (" + e.message + ")."); }
+  if (!d || typeof d !== "object" || !d.chain || !Array.isArray(d.chain.hops) || !Array.isArray(d.chainChecks))
+    throw new Error("That doesn't look like results from this tool (missing chain / chainChecks).");
+  d.encoding = d.encoding || []; d.takeover = d.takeover || null;
+  return d;
+}
+function copyButton(text, label) {
+  const b = el("button", "copy", label || "Copy"); b.type = "button";
+  b.addEventListener("click", () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => { b.textContent = "Copied"; setTimeout(() => { b.textContent = label || "Copy"; }, 1200); }, () => {});
+    else b.textContent = "Select the text above and copy it manually";
+  });
+  return b;
+}
+function renderChecks(checks, parent) {
+  const ul = el("ul", "checks");
+  for (const c of checks || []) {
+    const s = st(c.status), li = el("li", s), head = el("div");
+    head.appendChild(el("span", "badge " + s, s.toUpperCase())); head.appendChild(el("strong", null, c.title));
+    li.appendChild(head);
+    if (c.detail) li.appendChild(el("div", "detail", c.detail));
+    for (const [k, v] of (c.extra && c.extra.show) || []) { li.appendChild(el("div", "detail", k + ":")); li.appendChild(el("pre", null, v)); }
+    ul.appendChild(li);
+  }
+  parent.appendChild(ul);
+}
+
+/* ---------- rendering ---------- */
+function renderTechnical(d, parent) {
+  const det = el("details", "tech"); det.appendChild(el("summary", null, "Technical details (for whoever fixes the link)"));
+  const inner = el("div", "inner"); det.appendChild(inner);
+  const V = d.appView;
+  if (V) {
+    inner.appendChild(el("h5", null, "What the app receives at step " + V.hop + " (" + V.host + "), before any redirect decodes it"));
+    const av = el("div", "appview");
+    const row = (label, value, cls) => { av.appendChild(el("div", "detail", label)); av.appendChild(el("pre", cls || null, value)); };
+    row("Address handed to the app (untouched)", V.appReceives);
+    for (const l of V.levels || []) row(l.label + (l.app ? "  ← the app stops here" : ""), l.value, l.app ? "app" : null);
+    if (V.route) row("walmart:// route the app builds" + (V.approximate ? " (approximate)" : ""), V.route, V.malformed ? "badroute" : null);
+    if (V.malformed) av.appendChild(el("div", "detail error", "Malformed: it holds an encoded address where a route should be, so no route matches."));
+    if (V.note) av.appendChild(el("div", "detail", V.note));
+    if (V.webNext) {
+      row("Where the web redirect at this step goes", V.webNext);
+      if (V.webMatchesFull) av.appendChild(el("div", "detail", "Same page as the fully decoded value: the server decodes repeatedly, the app decodes only once."));
+    }
+    inner.appendChild(av);
+  }
+  if (d.destinationChecks && d.destinationChecks.length) { inner.appendChild(el("h5", null, "Where it lands in each app (route matched)")); renderChecks(d.destinationChecks, inner); }
+  inner.appendChild(el("h5", null, "Redirect checks")); renderChecks(d.chainChecks, inner);
+  const enc = d.encoding.filter((e) => e.checks && e.checks.length);
+  if (enc.length) inner.appendChild(el("h5", null, "Encoding checks"));
+  for (const e of enc) { inner.appendChild(el("div", "detail", "Step " + (e.i + 1) + " — " + ((e.hop && (e.hop.host || e.hop.url)) || ""))); renderChecks(e.checks, inner); }
+  for (const g of d.takeover || []) { if (!g.checks || !g.checks.length) continue; inner.appendChild(el("h5", null, "App-opening address: " + g.name)); renderChecks(g.checks, inner); }
+  parent.appendChild(det);
+}
+
+function renderJourney(F, parent) {
+  const wrap = el("div", "journey");
+  wrap.appendChild(el("h3", null, "The link's journey"));
+  const route = el("div", "route"), boxes = [];
+  F.journey.forEach((j, i) => {
+    if (i) route.appendChild(el("span", "arrow", "↓"));
+    const stop = el("span", "stop");
+    const btn = el("button", "dom"); btn.type = "button"; btn.setAttribute("title", j.url); btn.setAttribute("aria-expanded", "false");
+    btn.appendChild(el("span", "host", j.label)); btn.appendChild(el("span", "dots", "…")); stop.appendChild(btn);
+    if (j.opens) stop.appendChild(el("span", "tag", "App opens here"));
+    if (j.flag) stop.appendChild(el("span", "tag " + j.flag.tone, "⚠ " + j.flag.text));
+    route.appendChild(stop);
+    const box = el("div", "j-full"); box.style.display = "none";
+    box.appendChild(el("div", "j-label", "Step " + j.n + " (" + j.status + "):")); box.appendChild(el("pre", null, j.url)); box.appendChild(copyButton(j.url, "Copy address"));
+    boxes.push(box);
+    btn.addEventListener("click", () => { const open = box.style.display === "none"; box.style.display = open ? "" : "none"; btn.setAttribute("aria-expanded", String(open)); });
+  });
+  wrap.appendChild(route);
+  for (const b of boxes) wrap.appendChild(b);
+  if (F.source === "redirectcheck.org") wrap.appendChild(el("p", "source", "Followed by " + F.source + ", which is not a phone and can't run JavaScript, so some redirectors may show as unknown. Click a name to see its full address."));
+  else wrap.appendChild(el("p", "source", "Click a name to see its full address."));
+  parent.appendChild(wrap);
+}
+
+function renderReport(d, note) {
+  const out = $("out"); out.textContent = "";
+  if (typeof DLCore === "undefined") throw new Error("The checking code (core.js) was not loaded.");
+  const F = DLCore.friendlySummary(d);
+  if (note) {
+    // If we couldn't follow the link AND the pasted link alone told us nothing, the note is the whole answer.
+    const alone = F.overall.state === "cant";
+    const c = el("div", "callout"), t = el("div"); t.appendChild(el("strong", null, note.title));
+    t.appendChild(document.createTextNode(note.text + (!alone && note.more ? " " + note.more : "")));
+    c.appendChild(t); out.appendChild(c);
+    if (alone) return;
+  }
+
+  const ban = el("div", "banner " + F.overall.state); ban.setAttribute("role", "status");
+  const big = el("span", "big", ICON[F.overall.state]); big.setAttribute("aria-hidden", "true"); ban.appendChild(big);
+  const bt = el("div"); bt.appendChild(el("h2", null, F.overall.title)); bt.appendChild(el("p", null, F.overall.text)); ban.appendChild(bt);
+  out.appendChild(ban);
+
+  const card = el("section", "card"), ul = el("ul", "pillars");
+  for (const p of F.pillars) {
+    const li = el("li", "pillar " + p.state), dot = el("span", "dot " + p.state, ICON[p.state]); dot.setAttribute("aria-hidden", "true");
+    li.appendChild(dot);
+    const body = el("div", "p-body");
+    body.appendChild(el("div", "p-title", p.id + ". " + p.title));
+    body.appendChild(el("p", "p-head", p.headline));
+    if (p.text) body.appendChild(el("p", "p-text", p.text));
+    if (p.rows && p.rows.length) {
+      const ul2 = el("ul", "lands");
+      for (const r of p.rows) {
+        const li2 = el("li", "land " + r.state);
+        const head = el("div", "land-head");
+        head.appendChild(el("span", "plat", r.platform)); head.appendChild(el("span", "tag " + (r.state === "ok" ? "ok" : r.state), r.short.charAt(0).toUpperCase() + r.short.slice(1)));
+        li2.appendChild(head);
+        li2.appendChild(el("p", "land-text", r.text));
+        for (const n of r.notes) li2.appendChild(el("p", "land-note", n));
+        ul2.appendChild(li2);
+      }
+      body.appendChild(ul2);
+    }
+    for (const it of p.issues) {
+      const box = el("div", "issue " + it.tone);
+      box.appendChild(el("p", null, it.text));
+      if (it.fix) { const f = el("p", "fix"); f.appendChild(el("strong", null, "What to do: ")); f.appendChild(document.createTextNode(it.fix)); box.appendChild(f); }
+      if (it.copy) { const cb = el("div", "copybox"); cb.appendChild(el("div", "lbl", it.copyLabel || "Corrected link")); cb.appendChild(el("pre", null, it.copy)); cb.appendChild(copyButton(it.copy, "Copy corrected link")); box.appendChild(cb); }
+      body.appendChild(box);
+    }
+    li.appendChild(body); ul.appendChild(li);
+  }
+  card.appendChild(ul);
+  renderJourney(F, card);
+  for (const w of F.notes) card.appendChild(el("p", "source", "Note: " + w));
+  out.appendChild(card);
+  // Technical details only when there is something to fix or explain.
+  if (F.overall.state !== "ok") renderTechnical(d, out);
+}
+
+/* ---------- running a check ---------- */
+function checkInBrowser(url) {   // nothing is fetched: only the pasted link itself is analysed
+  if (typeof DLCore === "undefined") throw new Error("The checking code (core.js) was not loaded.");
+  let host; try { host = new URL(url).hostname.toLowerCase(); } catch (e) { throw new Error("That doesn't look like a complete web link. Paste the whole link, starting with https://"); }
+  const chain = { startUrl: url, stopped: "done", untraced: true, hops: [{ index: 0, url, host, status: null }] };
+  return DLCore.buildReport(chain, expectArgs());
+}
+async function checkViaApi(url) {
+  if (typeof DLCore === "undefined") throw new Error("The checking code (core.js) was not loaded.");
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);
+  let r;
+  try {
+    r = await fetch(REDIRECTCHECK_API, { method: "POST", headers: { "content-type": "application/json" }, signal: ctl.signal,
+      body: JSON.stringify({ url, method: "GET", followMetaRefresh: true }) });
+  } catch (e) {
+    const err = new Error(e.name === "AbortError" ? "The redirect checker didn't answer in time." : "The redirect checker (redirectcheck.org) can't be reached.");
+    err.vpn = true; throw err;
+  } finally { clearTimeout(timer); }
+  const body = await r.json().catch(() => null);
+  if (!r.ok) throw new Error("The redirect checker returned an error (HTTP " + r.status + (body && body.error ? ": " + String(body.error).slice(0, 160) : "") + ").");
+  return DLCore.buildReport(DLCore.chainFromRedirectCheck(body), expectArgs());
+}
+// The hops API only follows the link and returns the hops; every check and the app routes run here, in the browser.
+function hopsApiBase() {
+  const c = String(CONFIG.hopsApi || "").trim().replace(/\/+$/, "");
+  if (c) return c;
+  return location.protocol === "http:" || location.protocol === "https:" ? "" : null; // "" = the server this page came from
+}
+async function checkOnServer(url) {
+  if (typeof DLCore === "undefined") throw new Error("The checking code (core.js) was not loaded.");
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
+  let r;
+  try { r = await fetch(apiBase + "/api/hops?" + new URLSearchParams({ url, ua: "ios" }).toString(), { signal: ctl.signal }); }
+  catch (e) { throw new Error(e.name === "AbortError" ? "The link checker didn't answer in time." : "The link checker can't be reached."); }
+  finally { clearTimeout(timer); }
+  const body = await r.json().catch(() => null);
+  if (!r.ok) throw new Error("The link checker returned an error (" + ((body && body.error) || "HTTP " + r.status) + ").");
+  if (!body || !Array.isArray(body.hops) || !body.hops.length) throw new Error("The link checker sent an answer this page doesn't understand.");
+  return DLCore.buildReport(body, expectArgs());
+}
+async function run() {
+  const url = $("url").value.trim().replace(/\s+/g, "");
+  $("msg").textContent = "";
+  if (!url) { $("msg").textContent = "Paste a link first."; return; }
+  const btn = $("go"); btn.disabled = true; btn.textContent = "Checking…";
+  try {
+    let d, note = null;
+    try { new URL(url); } catch (e) { throw new Error("That doesn't look like a complete web link. Paste the whole link, starting with https://"); }
+    try { d = serverOk ? await checkOnServer(url) : await checkViaApi(url); }
+    catch (e) {
+      d = checkInBrowser(url);
+      note = { title: "We couldn't follow the link.", text: e.vpn ? VPN_NOTE : e.message, more: "Until then we can only check the link you pasted, not where it goes." };
+    }
+    renderReport(d, note);
+  } catch (e) { $("out").textContent = ""; $("msg").textContent = e.message; }
+  btn.disabled = false; btn.textContent = "Check link";
+}
+
+async function detectServer() {
+  const base = hopsApiBase();
+  if (base !== null) {
+    try { // only our API counts: other hosts (e.g. GitHub's own /healthz) answer differently
+      const h = await fetch(base + "/healthz"), j = h.ok ? await h.json().catch(() => ({})) : {};
+      serverOk = j.ok === true && j.service === "deeplink-hops"; runsJs = serverOk && !!j.runsJs; apiBase = base;
+    } catch (e) { serverOk = false; }
+  }
+  $("tracenote").textContent = serverOk
+    ? "Your link is followed by the Deeplink Checker's own server." + (runsJs ? " Redirect pages that use JavaScript are run in a headless browser to see where they go." : "")
+    : "Works only outside the Walmart VPN. Your link is sent to redirectcheck.org, a free service, so it can follow the redirects.";
+}
+$("go").addEventListener("click", run);
+$("url").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(); });
+detectServer();
+</script>
+</body>
+</html>

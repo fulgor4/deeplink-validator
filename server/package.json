@@ -1,0 +1,12 @@
+{
+  "name": "deeplink-hops-api",
+  "version": "1.0.0",
+  "description": "Follows every redirect of a link (HTTP, meta refresh, JavaScript pages in headless Chrome) and returns the hops. No dependencies.",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

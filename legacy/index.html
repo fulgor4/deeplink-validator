@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deeplink Validator</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --card: #fff; --text: #1b1d21; --muted: #5b616b; --border: #d6dae1;
+    --blue: #0053e2; --pass: #1a7f37; --warn: #8a5a00; --fail: #c4271c; --info: #3b5bdb;
+    --pass-bg: #e6f4ea; --warn-bg: #fff4d6; --fail-bg: #fde8e6; --info-bg: #e8edff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --card: #1e2127; --text: #eceff4; --muted: #a2a9b4; --border: #363b45;
+      --blue: #7fa8ff; --pass: #5fd37c; --warn: #f2c14e; --fail: #ff8a80; --info: #9db4ff;
+      --pass-bg: #17301f; --warn-bg: #3a2f10; --fail-bg: #3b1a17; --info-bg: #1d2750;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  p.sub { margin: 0 0 20px; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  textarea, input, select { width: 100%; padding: 10px; font: inherit; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+  textarea { min-height: 110px; font-family: var(--mono); font-size: 13px; resize: vertical; }
+  textarea:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 3px solid var(--blue); outline-offset: 2px; }
+  .row { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 12px; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--blue); background: var(--blue); color: #fff; }
+  @media (prefers-color-scheme: dark) { button { color: #0b1020; } }
+  button.secondary { background: transparent; color: var(--blue); }
+  .summary { border-radius: 10px; padding: 12px 14px; font-weight: 600; margin-bottom: 12px; }
+  .summary.pass { background: var(--pass-bg); color: var(--pass); }
+  .summary.warn { background: var(--warn-bg); color: var(--warn); }
+  .summary.fail { background: var(--fail-bg); color: var(--fail); }
+  ul.checks { list-style: none; padding: 0; margin: 0; }
+  ul.checks li { border: 1px solid var(--border); border-left-width: 6px; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; }
+  li.pass { border-left-color: var(--pass); } li.warn { border-left-color: var(--warn); }
+  li.fail { border-left-color: var(--fail); } li.info { border-left-color: var(--info); }
+  .badge { display: inline-block; min-width: 48px; text-align: center; font-size: 12px; font-weight: 700;
+    border-radius: 999px; padding: 1px 8px; margin-right: 8px; }
+  .badge.pass { background: var(--pass-bg); color: var(--pass); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn); }
+  .badge.fail { background: var(--fail-bg); color: var(--fail); }
+  .badge.info { background: var(--info-bg); color: var(--info); }
+  .detail { margin: 6px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  code, pre { font-family: var(--mono); font-size: 12.5px; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+  .group-title { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+    margin: 16px 0 6px; }
+  .note { font-size: 13px; color: var(--muted); }
+  label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; margin-top: 10px; }
+  label.check input { width: auto; margin-top: 4px; }
+  ol.chain { list-style: none; padding: 0; margin: 0 0 8px; }
+  ol.chain li { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+  ol.chain li.takeover { border-color: var(--blue); border-width: 2px; }
+  .hop-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .hop-host { font-weight: 700; }
+  .tag { font-size: 12px; border-radius: 999px; padding: 1px 8px; background: var(--info-bg); color: var(--info); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Deeplink Validator</h1>
+  <p class="sub">Checks a campaign link for the problems that make the Walmart iOS app open and then bounce to web.
+    Validation runs in your browser. With “Trace redirects” on, the link is also sent to this tool's server so it can follow the redirect chain.</p>
+
+  <section class="card" aria-labelledby="in-h">
+    <h2 id="in-h">Link to validate</h2>
+    <label for="url">URL</label>
+    <textarea id="url" spellcheck="false" placeholder="https://goto.walmart.com/c/2194827/568844/9383?u=..."></textarea>
+    <p class="hint">Paste the campaign link (click2cart, pgbuynow, …) or the <code>goto.walmart.com</code> link; redirects are followed for you.</p>
+    <label class="check"><input id="dotrace" type="checkbox" checked> Trace redirects (shows each site the link passes through; needs this page to be served by the tool's server)</label>
+    <div class="row">
+      <div>
+        <label for="etype">Expected destination type (optional)</label>
+        <select id="etype">
+          <option value="">Don't check</option>
+          <option value="brand">Brand page (/brand/…)</option>
+          <option value="ip">Item page (/ip/…)</option>
+          <option value="cp">Content page (/cp/…)</option>
+          <option value="path">Other: exact path</option>
+        </select>
+      </div>
+      <div>
+        <label for="eid">Expected ID / path</label>
+        <input id="eid" type="text" placeholder="e.g. 20084619  (or  grocery  for Other)">
+      </div>
+    </div>
+    <div class="actions">
+      <button id="go" type="button">Validate</button>
+      <button id="selftest" type="button" class="secondary">Run self-tests</button>
+    </div>
+  </section>
+
+  <section id="out" aria-live="polite"></section>
+
+  <p class="note">The app-side simulation is a port of <code>ImpactLink.manipulate()</code>,
+    <code>walmartSchemeURL</code> and <code>UniversalLinkComponents</code> from glass-app. Route matching is a heuristic:
+    the <code>[DL-DEBUG] canRoute=</code> log from a debug build is the ground truth.</p>
+</main>
+
+<script src="core.js"></script>
+<script>
+"use strict";
+const { validate, analyzeChain, appTakeoverIndex, TESTS } = DLCore;
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+const CAN_TRACE = location.protocol === "http:" || location.protocol === "https:";
+
+function renderChain(trace) {
+  const wrap = el("div");
+  wrap.appendChild(el("div", "group-title", "Redirect path"));
+  const ol = el("ol", "chain");
+  const ti = appTakeoverIndex(trace.hops);
+  trace.hops.forEach((h, i) => {
+    const li = el("li", i === ti ? "takeover" : "");
+    const head = el("div", "hop-head");
+    head.appendChild(el("span", "hop-host", `${i + 1}. ${h.host || "(invalid)"}`));
+    const ok = h.status && h.status < 400;
+    head.appendChild(el("span", "badge " + (h.appScheme ? "info" : h.error ? "fail" : h.reason ? "warn" : ok ? "pass" : "fail"),
+      h.appScheme ? "APP" : h.status != null ? String(h.status) : h.error ? "ERROR" : "NOT FETCHED"));
+    if (h.ms != null) head.appendChild(el("span", "detail", h.ms + " ms"));
+    if (i === ti) head.appendChild(el("span", "tag", "App opens here"));
+    li.appendChild(head);
+    if (h.error) li.appendChild(el("div", "detail", h.error));
+    if (h.reason) li.appendChild(el("div", "detail", "Not requested: " + h.reason));
+    if (h.nextUrl) {
+      const nu = new URL(h.nextUrl);
+      li.appendChild(el("div", "detail", "→ redirects to " + (/^https?:$/.test(nu.protocol) ? nu.hostname : h.nextUrl.split("?")[0]) +
+        (h.via ? " (" + h.via + " redirect found in the page)" : "")));
+    }
+    if (h.appScheme) head.appendChild(el("span", "tag", "Opens the app (custom scheme)"));
+    const d = el("details"); d.appendChild(el("summary", null, "Full URL"));
+    d.appendChild(el("pre", null, h.url)); li.appendChild(d);
+    ol.appendChild(li);
+  });
+  wrap.appendChild(ol);
+  return wrap;
+}
+
+function render(res, trace, note, target, pasted) {
+  const out = $("out"); out.textContent = "";
+  const all = res.groups.flatMap(x => x.checks);
+  const fails = all.filter(c => c.status === "fail"), warns = all.filter(c => c.status === "warn");
+  const sum = el("div", "summary " + (fails.length ? "fail" : warns.length ? "warn" : "pass"),
+    fails.length ? `✗ ${fails.length} problem${fails.length > 1 ? "s" : ""}. First: ${fails[0].title}` :
+    warns.length ? `⚠ No blocking problems, ${warns.length} warning${warns.length > 1 ? "s" : ""}` : "✓ All checks passed");
+  const card = el("section", "card"); card.appendChild(sum);
+  if (note) card.appendChild(el("p", "note", note));
+  if (trace) card.appendChild(renderChain(trace));
+  if (target !== pasted) {
+    card.appendChild(el("div", "detail", "Checks below ran on the URL the app receives (the associated-domain hop):"));
+    card.appendChild(el("pre", null, target));
+  }
+  for (const grp of res.groups) {
+    if (!grp.checks.length) continue;
+    card.appendChild(el("div", "group-title", grp.name));
+    const ul = el("ul", "checks");
+    for (const c of grp.checks) {
+      const li = el("li", c.status);
+      const head = el("div");
+      head.appendChild(el("span", "badge " + c.status, c.status.toUpperCase()));
+      head.appendChild(el("strong", null, c.title));
+      li.appendChild(head);
+      if (c.detail) li.appendChild(el("div", "detail", c.detail));
+      if (c.extra && c.extra.show) for (const [k, v] of c.extra.show) {
+        li.appendChild(el("div", "detail", k + ":")); li.appendChild(el("pre", null, v));
+      }
+      if (c.extra && c.extra.curl) {
+        li.appendChild(el("div", "detail", "Run this and paste the Location value above:"));
+        li.appendChild(el("pre", null, c.extra.curl));
+      }
+      const copyText = c.extra && (c.extra.copy || c.extra.curl);
+      if (copyText) {
+        const b = el("button", "secondary", "Copy"); b.type = "button"; b.style.marginTop = "6px";
+        b.addEventListener("click", () => { navigator.clipboard.writeText(copyText).then(() => { b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1200); }); });
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
+    }
+    card.appendChild(ul);
+  }
+  out.appendChild(card);
+}
+
+function renderSelfTests() {
+  const out = $("out"); out.textContent = "";
+  const card = el("section", "card"); card.appendChild(el("h2", null, "Self-tests"));
+  const ul = el("ul", "checks"); let failed = 0;
+  for (const t of TESTS) {
+    let got, ok;
+    try { got = t.run(); ok = t.match ? t.match(got || "") : got === t.expect; } catch (e) { got = "threw: " + e.message; ok = false; }
+    if (!ok) failed++;
+    const li = el("li", ok ? "pass" : "fail");
+    const head = el("div"); head.appendChild(el("span", "badge " + (ok ? "pass" : "fail"), ok ? "PASS" : "FAIL"));
+    head.appendChild(el("strong", null, t.name)); li.appendChild(head);
+    if (!ok) li.appendChild(el("pre", null, "got:      " + got + (t.expect !== undefined ? "\nexpected: " + t.expect : "")));
+    ul.appendChild(li);
+  }
+  card.appendChild(el("div", "summary " + (failed ? "fail" : "pass"), failed ? `${failed} failing` : "All passing"));
+  card.appendChild(ul); out.appendChild(card);
+}
+
+async function run() {
+  const pasted = $("url").value.trim();
+  const etype = $("etype").value, eid = $("eid").value;
+  let trace = null, note = null, target = pasted;
+  if (pasted && $("dotrace").checked) {
+    if (!CAN_TRACE) note = "Redirect tracing needs this page to be served by the tool's server (it is open as a file). Validating the pasted URL only.";
+    else {
+      $("go").disabled = true; $("go").textContent = "Tracing…";
+      try {
+        const r = await fetch("/trace?url=" + encodeURIComponent(pasted));
+        if (!r.ok) throw new Error(((await r.json().catch(() => ({}))).error) || ("HTTP " + r.status));
+        trace = await r.json();
+      } catch (e) { note = "Redirect trace unavailable (" + e.message + "). Validating the pasted URL only."; }
+      $("go").disabled = false; $("go").textContent = "Validate";
+    }
+  }
+  if (trace) { const ti = appTakeoverIndex(trace.hops); if (ti >= 0) target = trace.hops[ti].url; }
+  const traceIncomplete = !!trace && appTakeoverIndex(trace.hops) < 0 && ["blocked", "error"].includes(trace.stopped);
+  const res = validate(target, etype, eid, { traceIncomplete });
+  if (trace) res.groups.unshift(analyzeChain(trace));
+  render(res, trace, note, target, pasted);
+}
+
+if (!CAN_TRACE) { $("dotrace").checked = false; $("dotrace").disabled = true; }
+$("go").addEventListener("click", run);
+$("selftest").addEventListener("click", renderSelfTests);
+$("url").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) run(); });
+</script>
+</body>
+</html>

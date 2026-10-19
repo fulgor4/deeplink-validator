@@ -1,0 +1,10 @@
+#!/bin/sh
+# Local development: ./serve  -> hops API + the web page on http://127.0.0.1:8080 (all server/server.mjs settings are honoured)
+# Prefers Bun (its fetch honours HTTP(S)_PROXY), falls back to Node 18+.
+export SERVE_SITE="${SERVE_SITE:-1}"  # local development: the hops API also serves the web page at /
+export NODE_USE_ENV_PROXY=1  # Node >= 22.21 / 24 then honours HTTP(S)_PROXY (ignored by older Node and by Bun)
+here=$(cd "$(dirname "$0")" && pwd)
+if command -v bun >/dev/null 2>&1; then exec bun "$here/server/server.mjs" "$@"
+elif [ -x "$HOME/.local/bin/bun" ]; then exec "$HOME/.local/bin/bun" "$here/server/server.mjs" "$@"
+elif command -v node >/dev/null 2>&1; then exec node "$here/server/server.mjs" "$@"
+else echo "serve: needs Node 18+ (or Bun) on PATH" >&2; exit 127; fi
